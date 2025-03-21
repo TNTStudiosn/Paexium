@@ -44,16 +44,13 @@ public class TeleportParcelaCommand {
         }
 
         Vec3i[] coords = parcelas.get(id);
-        Vec3i target = coords[0]; // esquina pos1
+        Vec3i target = coords[0];
 
-        // 📦 Teleport +1 en altura
         player.teleport(player.getServerWorld(), target.getX() + 0.5, target.getY() + 1, target.getZ() + 0.5, player.getYaw(), player.getPitch());
         source.sendFeedback(() -> Text.literal("📍 Teletransportado a la parcela " + id), false);
         return Command.SINGLE_SUCCESS;
     }
 
-
-    // Autocompletado dinámico
     private static final SuggestionProvider<ServerCommandSource> PARCELA_SUGGESTIONS = (context, builder) -> {
         ParcelManager.getParcelas().keySet().stream()
                 .map(String::valueOf)
