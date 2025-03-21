@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "paexium",
+  "version": "${version}",
+  "name": "Paexium",
+  "description": "Mod creado para el evento de paexium",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/paexium/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.TNTStudios.paexium.client.PaexiumClient"
+    ],
+    "main": [
+      "com.TNTStudios.paexium.Paexium"
+    ]
+  },
+  "mixins": [
+    "paexium.mixins.json",
+    {
+      "config": "paexium.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
