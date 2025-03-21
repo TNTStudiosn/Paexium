@@ -9,142 +9,189 @@ import net.minecraft.util.Identifier;
 
 public class RuletaOverlay implements HudRenderCallback {
 
-    // Ruta a la textura de la ruleta (200x200 px, por ejemplo)
+    // Textura de la ruleta
     private static final Identifier RULETA_TEXTURE = new Identifier("paexium", "textures/gui/ruleta.png");
+    // Textura de la flecha
+    private static final Identifier ARROW_TEXTURE = new Identifier("paexium", "textures/gui/flecha.png");
 
-    // Opciones que se muestran en la ruleta.
-    // Puedes cambiar estos textos o cargarlos dinámicamente.
     private static final String[] OPCIONES = {
-            "opcion1", "opcion2", "opcion3", "opcion4",
-            "opcion5", "opcion6", "opcion7", "opcion8"
+            "opcion1","opcion2","opcion3","opcion4",
+            "opcion5","opcion6","opcion7","opcion8"
     };
 
-    // Estado de la animación
+    private static final int DURATION = 280;
+    private static final float BASE_SPINS_DEGREES = 3240.0f;
+
     private static boolean spinning = false;
-    private static float angle = 0;          // Ángulo actual de la ruleta en grados
-    private static float speed = 0;          // Velocidad actual en grados/tick
-    private static int chosenOption = -1;    // Índice de la opción ganadora
+    private static boolean finishedSpin = false;
+    private static int chosenOption = -1;
+    private static int postSpinTicks = 0;
 
-    // Control de tiempo para asegurar ~6 segundos de giro
-    private static int spinTick = 0;         // Cuántos ticks han pasado desde que empezó el giro
-    private static final int MAX_SPIN_TICKS = 120; // 120 ticks = 6 segundos a 20 TPS
+    private static long startServerTick = 0;
+    private static float finalAngle = 0;
+    private static int prevStep = -1;
 
-    // Para el sonido de “tick” de la ruleta
-    private static int tickSoundCounter = 0;
-
-    /**
-     * Llamado desde el packet cuando el servidor decide la opción ganadora.
-     */
-    public static void startSpin(int opcionGanadora) {
+    public static void startSpin(int opcionGanadora, long serverTick) {
         spinning = true;
+        finishedSpin = false;
         chosenOption = opcionGanadora;
-
-        // Reiniciamos la animación
-        angle = 0.0f;
-        speed = 25.0f;        // Velocidad inicial (grados/tick). Ajusta si quieres giros más rápidos/lentos
-        spinTick = 0;
-        tickSoundCounter = 0;
+        startServerTick = serverTick;
+        postSpinTicks = 0;
+        prevStep = -1;
     }
 
     @Override
     public void onHudRender(DrawContext drawContext, float tickDelta) {
-        if (!spinning) return;
+        if (!spinning && postSpinTicks <= 0) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
-        // Centro de la ventana
+        if (client.world == null) return;
+
+        long currentServerTime = client.world.getTime();
+        long elapsed = currentServerTime - startServerTick;
+
+        // Aún no empieza
+        if (elapsed < 0) return;
+
+        float t = (float) elapsed / (float) DURATION;
+        if (t > 1.0f) t = 1.0f;
+
+        // Ease out
+        float ease = 1.0f - (float)Math.pow(1.0f - t, 2);
+
+        // Ángulo para dejar la rebanada ganadora arriba
+        float targetAngle = 360f - (chosenOption * 45f) - 22.5f;
+        finalAngle = BASE_SPINS_DEGREES + targetAngle;
+
+        float angle = (!finishedSpin) ? finalAngle * ease : finalAngle;
+
+        // Dibuja la ruleta (rotando)
+        drawRuleta(drawContext, angle);
+
+        // Si quieres que la flecha sea FIJA (no rote con la ruleta),
+        // la dibujamos FUERA del push/pop de la ruleta:
+        drawArrow(drawContext);
+
+        if (!finishedSpin) {
+            playTickSound(client, t);
+
+            if (t >= 1.0f) {
+                finishedSpin = true;
+                postSpinTicks = 180;
+
+                client.getSoundManager().play(
+                        PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0F)
+                );
+                if (client.player != null && chosenOption >= 0 && chosenOption < OPCIONES.length) {
+                    client.player.sendMessage(
+                            net.minecraft.text.Text.literal("¡La ruleta cayó en: " + OPCIONES[chosenOption] + "!")
+                    );
+                }
+            }
+        } else {
+            postSpinTicks--;
+            if (postSpinTicks <= 0) {
+                spinning = false;
+            }
+        }
+    }
+
+    private void drawRuleta(DrawContext drawContext, float angle) {
+        MinecraftClient client = MinecraftClient.getInstance();
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
 
-        // Guardar matriz original
         drawContext.getMatrices().push();
-
-        // Mover al centro
+        // Trasladar al centro + rotar la ruleta
         drawContext.getMatrices().translate(centerX, centerY, 0);
-
-        // Rotar según el ángulo actual (ruleta girada)
         drawContext.getMatrices().multiply(
-                new org.joml.Quaternionf().rotationXYZ(0, 0, (float) Math.toRadians(angle))
+                new org.joml.Quaternionf().rotationXYZ(0, 0, (float)Math.toRadians(angle))
         );
 
-        // Dibujar la textura
-        int radius = 100; // La mitad del tamaño de la imagen (200x200)
+        // Dibujamos la ruleta en 200x200
+        int radius = 100;
         drawContext.drawTexture(RULETA_TEXTURE, -radius, -radius, 0, 0, 200, 200, 200, 200);
 
-        // **Dibujar el texto** sobre cada slice de la ruleta, girando con ella
-        // Cada slice son 45° (360/8). Usamos un radio menor que 'radius' para centrar el texto.
+        // Dibujamos el texto “inclinado/tangencial”
         int textRadius = 60;
         for (int i = 0; i < 8; i++) {
-            // Ángulo central de cada porción (slice)
+            String label = OPCIONES[i];
             float sliceAngle = (45 * i) + 22.5f;
-            double rad = Math.toRadians(sliceAngle);
+            float rad = (float)Math.toRadians(sliceAngle);
+            float textX = (float)(Math.cos(rad) * textRadius);
+            float textY = (float)(Math.sin(rad) * textRadius);
 
-            // Posición del texto en coordenadas locales (ya rotadas por 'angle')
-            float textX = (float) (Math.cos(rad) * textRadius);
-            float textY = (float) (Math.sin(rad) * textRadius);
-
-            // Dibujar el texto centrado y con sombra
-            drawContext.drawCenteredTextWithShadow(
-                    client.textRenderer,
-                    OPCIONES[i],
-                    (int) textX,
-                    (int) textY,
-                    0xFFFFFF // color blanco
+            drawContext.getMatrices().push();
+            drawContext.getMatrices().translate(textX, textY, 0);
+            // Rotamos para “seguir” la curva, por ejemplo “sliceAngle”
+            drawContext.getMatrices().multiply(
+                    new org.joml.Quaternionf().rotationXYZ(0, 0, (float)Math.toRadians(sliceAngle))
             );
+
+            int textWidth = client.textRenderer.getWidth(label);
+            int textHeight = 9;
+            drawContext.drawText(
+                    client.textRenderer,
+                    label,
+                    -textWidth / 2,
+                    -textHeight / 2,
+                    0xFFFFFF,
+                    false
+            );
+            drawContext.getMatrices().pop();
         }
 
-        // Restaurar la matriz (para no afectar otros renders de HUD)
+        // Salimos del push() de la ruleta
         drawContext.getMatrices().pop();
-
-        // Avanzar la animación
-        updateSpin(client);
     }
 
     /**
-     * Lógica de animación (velocidad, frenado, sonidos, etc.)
+     * Dibuja la flecha por encima de la ruleta, sin rotación.
+     * Ajusta 'flechaWidth/Height' y las coords para posicionarla.
      */
-    private void updateSpin(MinecraftClient client) {
-        spinTick++;
-        if (spinTick <= MAX_SPIN_TICKS) {
-            // Sigue girando
-            angle += speed;
+    private void drawArrow(DrawContext drawContext) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int screenWidth = client.getWindow().getScaledWidth();
+        int screenHeight = client.getWindow().getScaledHeight();
 
-            // Sonido “tick” cada cierto número de ticks
-            tickSoundCounter++;
-            if (tickSoundCounter >= 5) {
-                client.getSoundManager().play(
-                        PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING, 1.0F)
-                );
-                tickSoundCounter = 0;
-            }
+        // Por ejemplo, una flecha de 200x200
+        int flechaWidth = 200;
+        int flechaHeight = 200;
 
-            // Frenado lineal a lo largo de MAX_SPIN_TICKS ( de speed inicial a 0 en 120 ticks )
-            float decPerTick = 25.0f / MAX_SPIN_TICKS;
-            speed = Math.max(0, speed - decPerTick);
 
-        } else {
-            // Ya pasaron los 6 segundos (o más), paramos
-            spinning = false;
+        // La ubicamos en el centro Y, a la derecha de la ruleta (x = centro + radius + 10)
+        int centerX = screenWidth / 2;
+        int centerY = screenHeight / 2;
+        int radius = 100;
 
-            // Ajustar ángulo final para que el sector chosenOption quede "arriba" (o donde quieras)
-            // Cada slice son 45°, restamos ~22.5 para centrar
-            float finalAngle = 360f - (45f * chosenOption) - 22.5f;
-            angle = (finalAngle % 360f + 360f) % 360f; // normalizar
+        int arrowX = centerX - (flechaWidth / 2) + 14;
+        int arrowY = centerY - (flechaHeight / 2);
 
-            // Sonido final
+        // Simplemente dibujamos la flecha
+        drawContext.drawTexture(
+                ARROW_TEXTURE,
+                arrowX,
+                arrowY,
+                0,
+                0,
+                flechaWidth,
+                flechaHeight,
+                flechaWidth,
+                flechaHeight
+        );
+    }
+
+    private void playTickSound(MinecraftClient client, float t) {
+        int stepCount = 20;
+        float step = 1.0f / stepCount;
+        int currentStep = (int)(t / step);
+        if (currentStep != prevStep) {
+            prevStep = currentStep;
             client.getSoundManager().play(
-                    PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0F)
+                    PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_PLING, 1.0F)
             );
-
-            // Mensaje de resultado
-            if (client.player != null) {
-                client.player.sendMessage(
-                        net.minecraft.text.Text.literal(
-                                "¡La ruleta cayó en: " + OPCIONES[chosenOption] + "!"
-                        )
-                );
-            }
         }
     }
 }

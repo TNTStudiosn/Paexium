@@ -25,11 +25,11 @@ public class PaexiumClient implements ClientModInitializer {
         // Registrar handler
         ClientPlayNetworking.registerGlobalReceiver(RuletaNetworking.RULETA_PACKET_ID, (client, handler, buf, responseSender) -> {
             int opcion = buf.readInt();
+            long startTick = buf.readLong(); // nuevo
 
-            // Ejecutar en el hilo de render (client thread)
             client.execute(() -> {
-                // Aquí iniciamos la animación de la ruleta en el cliente
-                RuletaOverlay.startSpin(opcion);
+                // Arrancamos la ruleta con la opción y el tick de inicio
+                RuletaOverlay.startSpin(opcion, startTick);
             });
         });
 
