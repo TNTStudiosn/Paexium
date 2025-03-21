@@ -46,4 +46,8 @@ public class ParcelManager {
             e.printStackTrace();
         }
     }
+
+    public static Map<Integer, Vec3i[]> getParcelas() {
+        return parcelas;
+    }
 }
