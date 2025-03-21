@@ -6,7 +6,10 @@ import net.minecraft.client.gui.DrawContext;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 
 import net.minecraft.client.sound.PositionedSoundInstance;
+import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 public class RuletaOverlay implements HudRenderCallback {
@@ -15,8 +18,8 @@ public class RuletaOverlay implements HudRenderCallback {
     private static final Identifier ARROW_TEXTURE = new Identifier("paexium", "textures/gui/flecha.png");
 
     private static final String[] OPCIONES = {
-            "opcion1","opcion2","opcion3","opcion4",
-            "opcion5","opcion6","opcion7","opcion8"
+            "Juguetes", "Castillo", "Futuro", "Medieval",
+            "Submarino", "Piratas", "Espacial", "Naturaleza"
     };
 
     private static final int DURATION = 280;
@@ -30,6 +33,7 @@ public class RuletaOverlay implements HudRenderCallback {
     private static long startServerTick = 0;
     private static float finalAngle = 0;
     private static int prevStep = -1;
+    private static boolean titleDisplayed = false;
 
     public static void startSpin(int opcionGanadora, long serverTick) {
         spinning = true;
@@ -38,6 +42,7 @@ public class RuletaOverlay implements HudRenderCallback {
         startServerTick = serverTick;
         postSpinTicks = 0;
         prevStep = -1;
+        titleDisplayed = false;
     }
 
     private static float finalOverlayYOffset = 0;
@@ -64,20 +69,22 @@ public class RuletaOverlay implements HudRenderCallback {
         float overlayOpacity = 1.0f;
         float overlayYOffset = 0.0f;
 
+        // Fade In: primeros 10% de la animación
         if (!finishedSpin && t < 0.1f) {
             float progress = t / 0.1f;
-            overlayOpacity = progress;
-            overlayYOffset = (1 - progress) * 80;
+            overlayOpacity = progress;          // de 0 a 1
+            overlayYOffset = (1 - progress) * 80; // parte 80px abajo y sube a 0
         }
+        // Fade Out: durante la fase estática (finishedSpin)
         else if (finishedSpin) {
-            int fadeOutDuration = 200;
+            int fadeOutDuration = 200; // fade out prolongado en 200 ticks
             if (postSpinTicks > fadeOutDuration) {
                 overlayOpacity = 1.0f;
                 overlayYOffset = finalOverlayYOffset;
             } else {
                 float progress = (float)(fadeOutDuration - postSpinTicks) / fadeOutDuration;
-                overlayOpacity = 1.0f - progress;
-                overlayYOffset = finalOverlayYOffset + progress * 400;
+                overlayOpacity = 1.0f - progress; // de 1 a 0
+                overlayYOffset = finalOverlayYOffset + progress * 400; // se mueve 400px más abajo al desaparecer
             }
         }
 
@@ -91,24 +98,29 @@ public class RuletaOverlay implements HudRenderCallback {
         drawContext.getMatrices().pop();
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
+        // Manejo de tiempo y fin de animación
         if (!finishedSpin) {
             playTickSound(client, t);
             if (t >= 1.0f) {
                 finishedSpin = true;
                 finalOverlayYOffset = overlayYOffset;
-                postSpinTicks = 260;
-                client.getSoundManager().play(
-                        PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0F)
-                );
-                if (client.player != null && chosenOption >= 0 && chosenOption < OPCIONES.length) {
-                    client.player.sendMessage(
-                            net.minecraft.text.Text.literal("¡La ruleta cayó en: " + OPCIONES[chosenOption] + "!")
-                    );
-                }
+                postSpinTicks = 260; // tiempo estático antes del fade out
+                // Aquí ya no se envía mensaje de chat
             }
         } else {
             postSpinTicks--;
-            if (postSpinTicks <= 0) {
+            if (postSpinTicks <= 0 && !titleDisplayed) {
+                TitleS2CPacket titlePacket = new TitleS2CPacket(
+                        net.minecraft.text.Text.literal("La Tematica es:").formatted(Formatting.GOLD)
+                );
+                SubtitleS2CPacket subtitlePacket = new SubtitleS2CPacket(
+                        net.minecraft.text.Text.literal(OPCIONES[chosenOption]).formatted(Formatting.AQUA)
+                );
+                if (client.getNetworkHandler() != null) {
+                    client.getNetworkHandler().onTitle(titlePacket);
+                    client.getNetworkHandler().onSubtitle(subtitlePacket);
+                }
+                titleDisplayed = true;
                 spinning = false;
             }
         }
