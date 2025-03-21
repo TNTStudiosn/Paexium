@@ -7,8 +7,9 @@ import net.minecraft.util.Identifier;
 
 public class PaexiumItems {
 
+
     public static final Item CASCO = new ArmorItem(
-            ArmorMaterials.NETHERITE, // Si luego quieres uno personalizado, te ayudo
+            ArmorMaterials.NETHERITE,
             ArmorItem.Type.HELMET,
             new Item.Settings().maxCount(1)
     );
