@@ -18,8 +18,8 @@ public class RuletaOverlay implements HudRenderCallback {
     private static final Identifier ARROW_TEXTURE = new Identifier("paexium", "textures/gui/flecha.png");
 
     private static final String[] OPCIONES = {
-            "Juguetes", "Castillo", "Futuro", "Medieval",
-            "Submarino", "Piratas", "Espacial", "Naturaleza"
+            "Castillos", "Memes", "Videojuego", "Caricatura",
+            "Laberinto", "Casa", "Libre", "Naturaleza"
     };
 
     private static final int DURATION = 280;
