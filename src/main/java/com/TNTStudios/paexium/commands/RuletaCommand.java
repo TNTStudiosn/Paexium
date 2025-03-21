@@ -6,10 +6,24 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
 import net.minecraft.server.network.ServerPlayerEntity;
-
 import com.TNTStudios.paexium.network.RuletaNetworking;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RuletaCommand {
+
+    private static final List<Integer> availableOptions = new ArrayList<>();
+
+    static {
+        resetOptions();
+    }
+
+    private static void resetOptions() {
+        availableOptions.clear();
+        for (int i = 0; i < 8; i++) {
+            availableOptions.add(i);
+        }
+    }
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -19,7 +33,14 @@ public class RuletaCommand {
                         ServerCommandSource scs = context.getSource();
                         ServerPlayerEntity player = scs.getPlayer();
 
-                        int opcionGanadora = player.getRandom().nextInt(8);
+                        if (availableOptions.isEmpty()) {
+                            resetOptions();
+                            scs.sendFeedback(() -> Text.literal("Reiniciando ruleta"), false);
+                        }
+
+                        net.minecraft.util.math.random.Random random = player.getRandom();
+                        int index = random.nextInt(availableOptions.size());
+                        int opcionGanadora = availableOptions.remove(index);
 
                         long startServerTick = player.getWorld().getTime();
 
