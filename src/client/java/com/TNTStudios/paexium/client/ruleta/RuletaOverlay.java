@@ -1,17 +1,17 @@
 package com.TNTStudios.paexium.client.ruleta;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 
 public class RuletaOverlay implements HudRenderCallback {
 
-    // Textura de la ruleta
     private static final Identifier RULETA_TEXTURE = new Identifier("paexium", "textures/gui/ruleta.png");
-    // Textura de la flecha
     private static final Identifier ARROW_TEXTURE = new Identifier("paexium", "textures/gui/flecha.png");
 
     private static final String[] OPCIONES = {
@@ -40,6 +40,8 @@ public class RuletaOverlay implements HudRenderCallback {
         prevStep = -1;
     }
 
+    private static float finalOverlayYOffset = 0;
+
     @Override
     public void onHudRender(DrawContext drawContext, float tickDelta) {
         if (!spinning && postSpinTicks <= 0) return;
@@ -49,36 +51,52 @@ public class RuletaOverlay implements HudRenderCallback {
 
         long currentServerTime = client.world.getTime();
         long elapsed = currentServerTime - startServerTick;
-
-        // Aún no empieza
         if (elapsed < 0) return;
 
         float t = (float) elapsed / (float) DURATION;
         if (t > 1.0f) t = 1.0f;
 
-        // Ease out
         float ease = 1.0f - (float)Math.pow(1.0f - t, 2);
-
-        // Ángulo para dejar la rebanada ganadora arriba
         float targetAngle = 360f - (chosenOption * 45f) - 22.5f;
         finalAngle = BASE_SPINS_DEGREES + targetAngle;
-
         float angle = (!finishedSpin) ? finalAngle * ease : finalAngle;
 
-        // Dibuja la ruleta (rotando)
-        drawRuleta(drawContext, angle);
+        float overlayOpacity = 1.0f;
+        float overlayYOffset = 0.0f;
 
-        // Si quieres que la flecha sea FIJA (no rote con la ruleta),
-        // la dibujamos FUERA del push/pop de la ruleta:
+        if (!finishedSpin && t < 0.1f) {
+            float progress = t / 0.1f;
+            overlayOpacity = progress;
+            overlayYOffset = (1 - progress) * 80;
+        }
+        else if (finishedSpin) {
+            int fadeOutDuration = 200;
+            if (postSpinTicks > fadeOutDuration) {
+                overlayOpacity = 1.0f;
+                overlayYOffset = finalOverlayYOffset;
+            } else {
+                float progress = (float)(fadeOutDuration - postSpinTicks) / fadeOutDuration;
+                overlayOpacity = 1.0f - progress;
+                overlayYOffset = finalOverlayYOffset + progress * 400;
+            }
+        }
+
+        drawContext.getMatrices().push();
+        drawContext.getMatrices().translate(0, overlayYOffset, 0);
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, overlayOpacity);
+
+        drawRuleta(drawContext, angle);
         drawArrow(drawContext);
+
+        drawContext.getMatrices().pop();
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         if (!finishedSpin) {
             playTickSound(client, t);
-
             if (t >= 1.0f) {
                 finishedSpin = true;
-                postSpinTicks = 180;
-
+                finalOverlayYOffset = overlayYOffset;
+                postSpinTicks = 260;
                 client.getSoundManager().play(
                         PositionedSoundInstance.master(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0F)
                 );
@@ -96,6 +114,7 @@ public class RuletaOverlay implements HudRenderCallback {
         }
     }
 
+
     private void drawRuleta(DrawContext drawContext, float angle) {
         MinecraftClient client = MinecraftClient.getInstance();
         int screenWidth = client.getWindow().getScaledWidth();
@@ -104,17 +123,14 @@ public class RuletaOverlay implements HudRenderCallback {
         int centerY = screenHeight / 2;
 
         drawContext.getMatrices().push();
-        // Trasladar al centro + rotar la ruleta
-        drawContext.getMatrices().translate(centerX, centerY, 0);
+        drawContext.getMatrices().translate(centerX, centerY, 1000);
         drawContext.getMatrices().multiply(
                 new org.joml.Quaternionf().rotationXYZ(0, 0, (float)Math.toRadians(angle))
         );
 
-        // Dibujamos la ruleta en 200x200
         int radius = 100;
         drawContext.drawTexture(RULETA_TEXTURE, -radius, -radius, 0, 0, 200, 200, 200, 200);
 
-        // Dibujamos el texto “inclinado/tangencial”
         int textRadius = 60;
         for (int i = 0; i < 8; i++) {
             String label = OPCIONES[i];
@@ -125,7 +141,6 @@ public class RuletaOverlay implements HudRenderCallback {
 
             drawContext.getMatrices().push();
             drawContext.getMatrices().translate(textX, textY, 0);
-            // Rotamos para “seguir” la curva, por ejemplo “sliceAngle”
             drawContext.getMatrices().multiply(
                     new org.joml.Quaternionf().rotationXYZ(0, 0, (float)Math.toRadians(sliceAngle))
             );
@@ -142,34 +157,22 @@ public class RuletaOverlay implements HudRenderCallback {
             );
             drawContext.getMatrices().pop();
         }
-
-        // Salimos del push() de la ruleta
         drawContext.getMatrices().pop();
     }
 
-    /**
-     * Dibuja la flecha por encima de la ruleta, sin rotación.
-     * Ajusta 'flechaWidth/Height' y las coords para posicionarla.
-     */
     private void drawArrow(DrawContext drawContext) {
         MinecraftClient client = MinecraftClient.getInstance();
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
-
-        // Por ejemplo, una flecha de 200x200
         int flechaWidth = 200;
         int flechaHeight = 200;
-
-
-        // La ubicamos en el centro Y, a la derecha de la ruleta (x = centro + radius + 10)
         int centerX = screenWidth / 2;
         int centerY = screenHeight / 2;
-        int radius = 100;
-
         int arrowX = centerX - (flechaWidth / 2) + 14;
         int arrowY = centerY - (flechaHeight / 2);
 
-        // Simplemente dibujamos la flecha
+        drawContext.getMatrices().push();
+        drawContext.getMatrices().translate(0, 0, 1000);
         drawContext.drawTexture(
                 ARROW_TEXTURE,
                 arrowX,
@@ -181,6 +184,7 @@ public class RuletaOverlay implements HudRenderCallback {
                 flechaWidth,
                 flechaHeight
         );
+        drawContext.getMatrices().pop();
     }
 
     private void playTickSound(MinecraftClient client, float t) {

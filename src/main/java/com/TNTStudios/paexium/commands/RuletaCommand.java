@@ -14,18 +14,15 @@ public class RuletaCommand {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("ruleta")
-                    .requires(source -> source.hasPermissionLevel(2)) // Solo OP
+                    .requires(source -> source.hasPermissionLevel(4))
                     .executes(context -> {
                         ServerCommandSource scs = context.getSource();
                         ServerPlayerEntity player = scs.getPlayer();
 
-                        // Escoger aleatoriamente la opción (0..7)
                         int opcionGanadora = player.getRandom().nextInt(8);
 
-                        // Tomamos el tiempo de servidor:
                         long startServerTick = player.getWorld().getTime();
 
-                        // Enviamos la data al cliente: opción + startTick
                         RuletaNetworking.sendRuletaPacket(player, opcionGanadora, startServerTick);
 
                         scs.sendFeedback(() -> Text.literal("Girando la ruleta..."), false);
