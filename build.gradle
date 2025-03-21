@@ -32,6 +32,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "curse.maven:craterlib-867099:6150036"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    modImplementation "curse.maven:worldedit-225608:4586218"
 }
 
 processResources {
