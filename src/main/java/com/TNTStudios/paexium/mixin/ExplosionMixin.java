@@ -8,8 +8,10 @@ import org.spongepowered.asm.mixin.Overwrite;
 public class ExplosionMixin {
 
     /**
-     * Evita que cualquier explosión destruya bloques en el mundo.
-     * Esto incluye TNT, Creepers, Ghasts, etc.
+     * @author TNTStudios
+     * @reason Queremos evitar que cualquier explosión (TNT, creepers, etc.)
+     * destruya bloques del mundo. Este método sobrescribe el comportamiento
+     * original de la clase Explosion para impedir la destrucción de bloques.
      */
     @Overwrite
     public boolean shouldDestroy() {

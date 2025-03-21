@@ -19,7 +19,7 @@ public class RuletaOverlay implements HudRenderCallback {
 
     private static final String[] OPCIONES = {
             "Castillos", "Memes", "Videojuego", "Caricatura",
-            "Laberinto", "Casa", "Libre", "Naturaleza"
+            "Laberinto", "Casa", "Libre", "XPG"
     };
 
     private static final int DURATION = 280;
@@ -105,7 +105,6 @@ public class RuletaOverlay implements HudRenderCallback {
                 finishedSpin = true;
                 finalOverlayYOffset = overlayYOffset;
                 postSpinTicks = 260; // tiempo estático antes del fade out
-                // Aquí ya no se envía mensaje de chat
             }
         } else {
             postSpinTicks--;
@@ -122,6 +121,9 @@ public class RuletaOverlay implements HudRenderCallback {
                 }
                 titleDisplayed = true;
                 spinning = false;
+                client.getSoundManager().play(
+                        PositionedSoundInstance.master(SoundEvents.BLOCK_NOTE_BLOCK_BELL.value(), 1.0F, 2.0F)
+                );
             }
         }
     }
@@ -143,7 +145,7 @@ public class RuletaOverlay implements HudRenderCallback {
         int radius = 100;
         drawContext.drawTexture(RULETA_TEXTURE, -radius, -radius, 0, 0, 200, 200, 200, 200);
 
-        int textRadius = 60;
+        int textRadius = 55;
         for (int i = 0; i < 8; i++) {
             String label = OPCIONES[i];
             float sliceAngle = (45 * i) + 22.5f;
