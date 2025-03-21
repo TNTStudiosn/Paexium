@@ -44,7 +44,6 @@ public class RuletaCommand {
 
                         long startServerTick = opPlayer.getWorld().getTime();
 
-                        // Enviar el paquete a todos los jugadores
                         for (ServerPlayerEntity player : scs.getServer().getPlayerManager().getPlayerList()) {
                             RuletaNetworking.sendRuletaPacket(player, opcionGanadora, startServerTick);
                         }
