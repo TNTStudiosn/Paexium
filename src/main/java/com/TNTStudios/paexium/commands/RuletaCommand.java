@@ -4,7 +4,6 @@ import com.mojang.brigadier.Command;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
 import net.minecraft.server.network.ServerPlayerEntity;
 import com.TNTStudios.paexium.network.RuletaNetworking;
 import java.util.ArrayList;
@@ -35,7 +34,6 @@ public class RuletaCommand {
 
                         if (availableOptions.isEmpty()) {
                             resetOptions();
-                            scs.sendFeedback(() -> Text.literal("Reiniciando ruleta"), false);
                         }
 
                         net.minecraft.util.math.random.Random random = opPlayer.getRandom();
@@ -47,8 +45,6 @@ public class RuletaCommand {
                         for (ServerPlayerEntity player : scs.getServer().getPlayerManager().getPlayerList()) {
                             RuletaNetworking.sendRuletaPacket(player, opcionGanadora, startServerTick);
                         }
-
-                        scs.sendFeedback(() -> Text.literal("Girando la ruleta para todos los jugadores..."), false);
                         return Command.SINGLE_SUCCESS;
                     })
             );
