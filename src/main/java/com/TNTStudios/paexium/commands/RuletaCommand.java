@@ -31,22 +31,25 @@ public class RuletaCommand {
                     .requires(source -> source.hasPermissionLevel(4))
                     .executes(context -> {
                         ServerCommandSource scs = context.getSource();
-                        ServerPlayerEntity player = scs.getPlayer();
+                        ServerPlayerEntity opPlayer = scs.getPlayer();
 
                         if (availableOptions.isEmpty()) {
                             resetOptions();
                             scs.sendFeedback(() -> Text.literal("Reiniciando ruleta"), false);
                         }
 
-                        net.minecraft.util.math.random.Random random = player.getRandom();
+                        net.minecraft.util.math.random.Random random = opPlayer.getRandom();
                         int index = random.nextInt(availableOptions.size());
                         int opcionGanadora = availableOptions.remove(index);
 
-                        long startServerTick = player.getWorld().getTime();
+                        long startServerTick = opPlayer.getWorld().getTime();
 
-                        RuletaNetworking.sendRuletaPacket(player, opcionGanadora, startServerTick);
+                        // Enviar el paquete a todos los jugadores
+                        for (ServerPlayerEntity player : scs.getServer().getPlayerManager().getPlayerList()) {
+                            RuletaNetworking.sendRuletaPacket(player, opcionGanadora, startServerTick);
+                        }
 
-                        scs.sendFeedback(() -> Text.literal("Girando la ruleta..."), false);
+                        scs.sendFeedback(() -> Text.literal("Girando la ruleta para todos los jugadores..."), false);
                         return Command.SINGLE_SUCCESS;
                     })
             );
