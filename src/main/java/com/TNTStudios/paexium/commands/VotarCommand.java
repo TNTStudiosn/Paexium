@@ -47,12 +47,10 @@ public class VotarCommand {
                         }
                         List<Integer> parcelIds = new ArrayList<>(parcelas.keySet());
                         Collections.sort(parcelIds);
-                        if (parcelIds.size() > cantidadParcelasActivas) {
-                            parcelIds = parcelIds.subList(0, cantidadParcelasActivas);
-                        }
 
 
-                        // Obtener (o inicializar) la data de votación para la ronda actual
+
+                        // Inicializar o cargar la data de votación primero
                         String roundKey = String.valueOf(rondaNum);
                         Map<String, InfoParcela> votingData = VotacionManager.getVotingDataForRound(roundKey);
                         if (votingData == null) {
@@ -62,7 +60,6 @@ public class VotarCommand {
                             }
                             VotacionManager.setVotingDataForRound(roundKey, votingData);
                         } else {
-                            // Asegurar que estén todas las parcelas en la data
                             for (Integer pid : parcelIds) {
                                 String pidStr = String.valueOf(pid);
                                 if (!votingData.containsKey(pidStr)) {
@@ -70,6 +67,24 @@ public class VotarCommand {
                                 }
                             }
                         }
+
+                        boolean hayDesempate = votingData.values().stream().anyMatch(info -> info.esDesempate);
+                        if (hayDesempate) {
+                            Iterator<Integer> iterator = parcelIds.iterator();
+                            while (iterator.hasNext()) {
+                                int id = iterator.next();
+                                InfoParcela info = votingData.get(String.valueOf(id));
+                                if (info == null || !info.esDesempate) {
+                                    iterator.remove();
+                                }
+                            }
+                        }
+                        else {
+                            if (parcelIds.size() > cantidadParcelasActivas) {
+                                parcelIds = parcelIds.subList(0, cantidadParcelasActivas);
+                            }
+                        }
+
 
                         // Buscar la siguiente parcela que no haya sido votada
                         Integer nextParcel = null;
@@ -85,6 +100,7 @@ public class VotarCommand {
                             source.sendFeedback(() -> Text.literal("*Todas las parcelas fueron votadas*").formatted(Formatting.GOLD), false);
                             return 1;
                         }
+
 
                         // Si hay una parcela en votación activa, poner a sus jugadores en modo SPECTATOR y marcarla como votada
                         if (currentParcelVoting != null) {
@@ -131,8 +147,21 @@ public class VotarCommand {
 
                         final Integer finalNextParcel = nextParcel;
                         source.sendFeedback(() -> Text.literal("📍 Votación iniciada para la parcela " + finalNextParcel), false);
+                        InfoParcela actual = votingData.get(String.valueOf(finalNextParcel));
+                        if (actual != null && actual.esDesempate) {
+                            source.sendFeedback(() -> Text.literal("🟡 Esta es una votacion de desempate.").formatted(Formatting.YELLOW), false);
+
+                            for (ServerPlayerEntity player : source.getServer().getPlayerManager().getPlayerList()) {
+                                player.sendMessage(Text.literal("🟡 Iniciando votación de desempate").formatted(Formatting.YELLOW), false);
+                            }
+                        }
+
+
                         // Actualiza la data de votación persistente
                         VotacionManager.setVotingDataForRound(roundKey, votingData);
+
+
+
 
                         for (ServerPlayerEntity player : source.getServer().getPlayerManager().getPlayerList()) {
                             if (esJuez(player.getUuid())) {

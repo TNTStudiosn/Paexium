@@ -8,8 +8,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -26,7 +26,6 @@ import java.util.*;
 
 public class ResultadosCommand {
 
-    // Archivo para guardar los jugadores descalificados por ronda.
     private static final File descalificadosFile = new File("config/paexium/descalificados.json");
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -40,102 +39,80 @@ public class ResultadosCommand {
                                 ServerCommandSource source = ctx.getSource();
                                 MinecraftServer server = source.getServer();
 
-                                // Verificar que la ronda esté configurada
                                 RondaManager.RondaData rondaData = RondaManager.obtenerRondas().get(rondaNum);
                                 if (rondaData == null) {
                                     source.sendError(Text.literal("❌ La ronda " + rondaNum + " no está configurada."));
                                     return 0;
                                 }
-                                int eliminadosConfig = rondaData.eliminados;
 
-                                // Leer los datos de votación para la ronda
+                                int eliminadosConfig = rondaData.eliminados;
                                 Map<String, InfoParcela> votingData = VotacionManager.getVotingDataForRound(String.valueOf(rondaNum));
+
                                 if (votingData == null || votingData.isEmpty()) {
                                     source.sendError(Text.literal("❌ No hay datos de votación para la ronda " + rondaNum + "."));
                                     return 0;
                                 }
 
-                                // Ordenar las parcelas según el total de votos (de menor a mayor)
-                                List<Map.Entry<String, InfoParcela>> sortedParcels = new ArrayList<>(votingData.entrySet());
-                                sortedParcels.sort(Comparator.comparingInt(entry -> entry.getValue().total));
+                                List<Map.Entry<String, InfoParcela>> sorted = new ArrayList<>(votingData.entrySet());
+                                sorted.sort(Comparator.comparingInt(e -> e.getValue().total));
 
-                                // Agrupar por puntaje: clave = total de votos, valor = lista de entradas (parcelas) con ese puntaje
                                 LinkedHashMap<Integer, List<Map.Entry<String, InfoParcela>>> grouped = new LinkedHashMap<>();
-                                for (Map.Entry<String, InfoParcela> entry : sortedParcels) {
+                                for (Map.Entry<String, InfoParcela> entry : sorted) {
                                     int total = entry.getValue().total;
                                     grouped.computeIfAbsent(total, k -> new ArrayList<>()).add(entry);
                                 }
 
-                                int eliminatedCount = 0;
-                                List<UUID> descalificados = new ArrayList<>();
-                                boolean tieBreakNeeded = false;
-                                int parcelsToEliminateInTie = 0;
+                                List<Map.Entry<String, InfoParcela>> eliminables = new ArrayList<>();
+                                List<Map.Entry<String, InfoParcela>> empate = new ArrayList<>();
+                                int eliminadosPendientes = eliminadosConfig;
 
-                                // Procesar los grupos en orden ascendente de votos
                                 for (Map.Entry<Integer, List<Map.Entry<String, InfoParcela>>> groupEntry : grouped.entrySet()) {
-                                    List<Map.Entry<String, InfoParcela>> groupList = groupEntry.getValue();
-                                    int groupSize = groupList.size();
-
-                                    if (eliminatedCount + groupSize < eliminadosConfig) {
-                                        // Se puede eliminar el grupo completo sin exceder la configuración
-                                        for (Map.Entry<String, InfoParcela> parcelEntry : groupList) {
-                                            String parcelKey = parcelEntry.getKey();
-                                            int parcelId = Integer.parseInt(parcelKey);
-                                            // Marcar la parcela como votada (eliminada)
-                                            parcelEntry.getValue().votada = true;
-                                            // Eliminar a los jugadores asignados a esta parcela
-                                            eliminatePlayersFromParcel(server, parcelId, descalificados, source);
-                                        }
-                                        eliminatedCount += groupSize;
-                                    } else if (eliminatedCount + groupSize == eliminadosConfig) {
-                                        // Eliminando el grupo se alcanza exactamente el número requerido
-                                        for (Map.Entry<String, InfoParcela> parcelEntry : groupList) {
-                                            String parcelKey = parcelEntry.getKey();
-                                            int parcelId = Integer.parseInt(parcelKey);
-                                            parcelEntry.getValue().votada = true;
-                                            eliminatePlayersFromParcel(server, parcelId, descalificados, source);
-                                        }
-                                        eliminatedCount += groupSize;
-                                        // Enviar title y subtitle de jugadores descalificados
-                                        sendTitleSubtitleToAll(server, "Jugadores descalificados", "La ronda ha finalizado", Formatting.RED, Formatting.GRAY);
-                                        break; // Se cumple el total de eliminaciones
+                                    List<Map.Entry<String, InfoParcela>> grupo = groupEntry.getValue();
+                                    if (eliminables.size() + grupo.size() < eliminadosConfig) {
+                                        eliminables.addAll(grupo);
+                                    } else if (eliminables.size() + grupo.size() == eliminadosConfig) {
+                                        eliminables.addAll(grupo);
+                                        empate.clear();
+                                        break;
                                     } else {
-                                        // Eliminar el grupo completo excedería el número de eliminaciones requeridas: hay empate
-                                        tieBreakNeeded = true;
-                                        parcelsToEliminateInTie = eliminadosConfig - eliminatedCount;
-                                        // Dejar la bandera en false para que puedan re-votarse
-                                        for (Map.Entry<String, InfoParcela> parcelEntry : groupList) {
-                                            parcelEntry.getValue().votada = false;
-                                        }
-                                        // Enviar title y subtitle indicando empate y nueva votación
-                                        sendTitleSubtitleToAll(server, "Empate detectado", "Se realizará desempate para eliminar " + parcelsToEliminateInTie + " parcela(s)", Formatting.YELLOW, Formatting.AQUA);
-                                        break; // No se procesan más grupos
+                                        empate.addAll(grupo);
+                                        break;
                                     }
                                 }
 
-                                // Guardar la data de votación actualizada (con las parcelas empatadas marcadas para desempate)
-                                VotacionManager.setVotingDataForRound(String.valueOf(rondaNum), votingData);
+                                List<UUID> descalificados = new ArrayList<>();
 
-                                // Guardar en el archivo JSON la lista de jugadores descalificados (los que fueron eliminados en este paso)
-                                if (!descalificados.isEmpty()) {
-                                    guardarDescalificados(rondaNum, descalificados);
+                                // Eliminar los que claramente pierden
+                                for (Map.Entry<String, InfoParcela> entry : eliminables) {
+                                    int parcelaId = Integer.parseInt(entry.getKey());
+                                    entry.getValue().votada = true;
+                                    entry.getValue().esDesempate = false; // ✅ Ya no es una parcela en desempate
+                                    eliminatePlayersFromParcel(server, parcelaId, descalificados, source);
                                 }
 
-                                // Feedback al admin
-                                if (tieBreakNeeded) {
-                                    final int finalEliminatedCount = eliminatedCount;
-                                    final int finalParcelsToEliminateInTie = parcelsToEliminateInTie;
-                                    source.sendFeedback(
-                                            () -> Text.literal("✔ Se han eliminado " + finalEliminatedCount + " parcela(s). " +
-                                                    "Empate en el grupo para eliminar " + finalParcelsToEliminateInTie + " parcela(s)."),
-                                            false
-                                    );
+                                // Si hay empate, marcar para desempate
+                                if (!empate.isEmpty()) {
+                                    for (Map.Entry<String, InfoParcela> entry : empate) {
+                                        InfoParcela info = entry.getValue();
+                                        info.votada = false;
+                                        info.total = 0;
+                                        info.esDesempate = true;
+                                    }
+
+                                    int faltantes = eliminadosConfig - eliminables.size();
+                                    sendTitleSubtitleToAll(server, "Empate detectado", "Se hará desempate para eliminar " + faltantes + " parcela(s)", Formatting.YELLOW, Formatting.AQUA);
+
+                                    source.sendFeedback(() -> Text.literal("✔ Se eliminaron " + eliminables.size() + " parcela(s). Empate para " + faltantes + " restante(s)."), false);
                                 } else {
-                                    source.sendFeedback(
-                                            () -> Text.literal("✔ Resultados de la ronda " + rondaNum + " procesados. " +
-                                                    descalificados.size() + " jugador(es) eliminados."),
-                                            false
-                                    );
+                                    sendTitleSubtitleToAll(server, "Jugadores descalificados", "La ronda ha finalizado", Formatting.RED, Formatting.GRAY);
+
+                                    source.sendFeedback(() -> Text.literal("✔ Ronda " + rondaNum + " finalizada. Eliminados: " + descalificados.size()), false);
+                                }
+
+                                VotacionManager.setVotingDataForRound(String.valueOf(rondaNum), votingData);
+
+                                if (!descalificados.isEmpty()) {
+                                    guardarDescalificados(rondaNum, descalificados);
                                 }
 
                                 return 1;
@@ -145,80 +122,60 @@ public class ResultadosCommand {
         });
     }
 
-    /**
-     * Método auxiliar para eliminar a los jugadores asignados a una parcela.
-     * Se consulta el JSON de asignaciones y, para cada jugador asignado a la parcela,
-     * se cambia su modo de juego a SPECTATOR y se anuncia su eliminación.
-     */
     private static void eliminatePlayersFromParcel(MinecraftServer server, int parcelId, List<UUID> descalificados, ServerCommandSource source) {
         Map<UUID, Integer> asignaciones = AsignarParcelasCommand.cargarAsignaciones();
-        if (asignaciones == null || asignaciones.isEmpty()) return;
+        if (asignaciones == null) return;
+
         for (Map.Entry<UUID, Integer> entry : asignaciones.entrySet()) {
             if (entry.getValue() == parcelId) {
-                UUID playerUUID = entry.getKey();
-                descalificados.add(playerUUID);
-                ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerUUID);
+                UUID uuid = entry.getKey();
+                descalificados.add(uuid);
+
+                ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
                 if (player != null) {
                     player.changeGameMode(GameMode.SPECTATOR);
                 }
+
                 source.getServer().getPlayerManager().broadcast(
-                        Text.literal("❌ Eliminado: " + playerName(server, playerUUID) + " (Parcela " + parcelId + ")")
-                                .formatted(Formatting.RED),
-                        false
+                        Text.literal("❌ Eliminado: " + playerName(server, uuid) + " (Parcela " + parcelId + ")")
+                                .formatted(Formatting.RED), false
                 );
             }
         }
     }
 
-    /**
-     * Método auxiliar para enviar un Title y Subtitle a todos los jugadores conectados.
-     */
-    private static void sendTitleSubtitleToAll(MinecraftServer server, String titleText, String subtitleText, Formatting titleFormat, Formatting subtitleFormat) {
+    private static void sendTitleSubtitleToAll(MinecraftServer server, String title, String subtitle, Formatting titleFormat, Formatting subtitleFormat) {
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.networkHandler.sendPacket(new TitleS2CPacket(
-                    Text.literal(titleText).formatted(titleFormat)
-            ));
-            player.networkHandler.sendPacket(new SubtitleS2CPacket(
-                    Text.literal(subtitleText).formatted(subtitleFormat)
-            ));
+            player.networkHandler.sendPacket(new TitleS2CPacket(Text.literal(title).formatted(titleFormat)));
+            player.networkHandler.sendPacket(new SubtitleS2CPacket(Text.literal(subtitle).formatted(subtitleFormat)));
         }
     }
 
-    /**
-     * Método auxiliar para obtener el nombre del jugador a partir de su UUID.
-     * Si el jugador está online se retorna su nombre; de lo contrario se consulta el caché.
-     */
     private static String playerName(MinecraftServer server, UUID uuid) {
         ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
-        if (player != null) {
-            return player.getName().getString();
-        }
+        if (player != null) return player.getName().getString();
+
         return server.getUserCache().getByUuid(uuid)
                 .map(profile -> profile.getName())
-                .orElse(uuid.toString());
+                .orElse("Desconocido (" + uuid + ")");
     }
 
-    /**
-     * Método auxiliar para guardar en un archivo JSON los jugadores descalificados en la ronda.
-     */
     private static void guardarDescalificados(int ronda, List<UUID> descalificados) {
         Map<String, List<String>> data = new HashMap<>();
         if (descalificadosFile.exists()) {
             try (FileReader reader = new FileReader(descalificadosFile)) {
                 Type type = new TypeToken<Map<String, List<String>>>() {}.getType();
                 Map<String, List<String>> loaded = gson.fromJson(reader, type);
-                if (loaded != null) {
-                    data = loaded;
-                }
+                if (loaded != null) data = loaded;
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+
         List<String> lista = new ArrayList<>();
-        for (UUID uuid : descalificados) {
-            lista.add(uuid.toString());
-        }
+        for (UUID uuid : descalificados) lista.add(uuid.toString());
         data.put(String.valueOf(ronda), lista);
+
         try (FileWriter writer = new FileWriter(descalificadosFile)) {
             gson.toJson(data, writer);
         } catch (Exception e) {

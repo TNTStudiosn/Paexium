@@ -153,5 +153,7 @@ public class VotacionManager {
         public int total = 0;
         public Map<UUID, Integer> jugadores = new HashMap<>();
         public boolean votada = false; // Flag para indicar si la parcela ya fue votada
+        public boolean esDesempate = false;
+
     }
 }
