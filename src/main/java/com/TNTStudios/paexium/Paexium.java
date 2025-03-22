@@ -23,6 +23,7 @@ public class Paexium implements ModInitializer {
         EmpezarRondaCommand.register();
         InicioVotacionCommand.register();
         VotarCommand.register();
+        ResultadosCommand.register();
     }
 }
 
