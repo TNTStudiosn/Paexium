@@ -57,19 +57,7 @@ public class InicioVotacionCommand {
                                     if (esJuez(player.getUuid())) {
                                         player.changeGameMode(GameMode.CREATIVE);
 
-                                        // Limpiar inventario
-                                        player.getInventory().clear();
 
-                                        // Dar paletas
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_1.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_2.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_3.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_4.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_5.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_6.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_7.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_8.getDefaultStack());
-                                        player.getInventory().insertStack(PaexiumItems.PALETA_9.getDefaultStack());
                                     }
                                 }
 

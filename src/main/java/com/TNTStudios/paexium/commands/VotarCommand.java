@@ -1,5 +1,6 @@
 package com.TNTStudios.paexium.commands;
 
+import com.TNTStudios.paexium.items.PaexiumItems;
 import com.TNTStudios.paexium.parcelas.ParcelManager;
 import com.TNTStudios.paexium.votacion.VotacionManager;
 import com.TNTStudios.paexium.votacion.VotacionManager.InfoParcela;
@@ -119,6 +120,26 @@ public class VotarCommand {
                         source.sendFeedback(() -> Text.literal("📍 Votación iniciada para la parcela " + finalNextParcel), false);
                         // Actualiza la data de votación persistente
                         VotacionManager.setVotingDataForRound(roundKey, votingData);
+
+                        for (ServerPlayerEntity player : source.getServer().getPlayerManager().getPlayerList()) {
+                            if (esJuez(player.getUuid())) {
+                                player.getInventory().clear(); // Limpia inventario por si aún tienen paletas anteriores
+
+                                // Entregar paletas de votación
+                                player.getInventory().insertStack(PaexiumItems.PALETA_1.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_2.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_3.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_4.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_5.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_6.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_7.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_8.getDefaultStack());
+                                player.getInventory().insertStack(PaexiumItems.PALETA_9.getDefaultStack());
+
+                                // Mensaje de confirmación
+                                player.sendMessage(Text.literal("📦 Se te han entregado las paletas de votación").formatted(Formatting.GREEN), false);
+                            }
+                        }
 
                         return 1;
                     }));
