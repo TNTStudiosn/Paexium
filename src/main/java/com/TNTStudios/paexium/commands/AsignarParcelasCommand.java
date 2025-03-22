@@ -17,6 +17,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.world.GameMode;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.*;
 
@@ -88,6 +89,17 @@ public class AsignarParcelasCommand {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static Map<UUID, Integer> cargarAsignaciones() {
+        if (!file.exists()) return null;
+        try (FileReader reader = new FileReader(file)) {
+            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<UUID, Integer>>() {}.getType();
+            return gson.fromJson(reader, type);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }
