@@ -23,8 +23,8 @@ public class CascoArmorRenderer implements ArmorRenderer {
         if (slot == EquipmentSlot.HEAD) {
             matrices.push();
             contextModel.head.rotate(matrices);
-            matrices.translate(0.0F, -0.60F, 0.0F);
-            float scale = 0.6F;
+            matrices.translate(0.0F, -0.63F, 0.0F);
+            float scale = 0.72F;
             matrices.scale(scale, scale, scale);
             matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180));
             matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180));
@@ -33,7 +33,7 @@ public class CascoArmorRenderer implements ArmorRenderer {
                     stack,
                     ModelTransformationMode.NONE,
                     light,
-                    net.minecraft.client.render.OverlayTexture.DEFAULT_UV,
+                    net.minecraft.client.render.OverlayTexture.getUv(0, false),
                     matrices,
                     vertexConsumers,
                     entity.getWorld(),

@@ -31,7 +31,7 @@ public class AttackEntityMixin {
         ServerPlayNetworkHandler handler = (ServerPlayNetworkHandler) (Object) this;
         ServerPlayerEntity attacker = handler.player;
 
-        if (attacker.getServer() == null) return;
+        if (attacker.getServer() == null || attacker.getWorld().isClient()) return;
 
         int ronda = VotacionManager.getRondaActual();
         if (ronda <= 0) return;
@@ -75,12 +75,30 @@ public class AttackEntityMixin {
 
     private boolean esJuez(UUID uuid) {
         try {
-            User user = LuckPermsProvider.get().getUserManager().getUser(uuid);
-            return user != null && user.getCachedData().getPermissionData().checkPermission("paexium.juez").asBoolean();
+            if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("luckperms")) {
+                return false;
+            }
+
+            // Usamos reflexión para evitar ClassNotFoundException en el cliente
+            Class<?> providerClass = Class.forName("net.luckperms.api.LuckPermsProvider");
+            Object provider = providerClass.getMethod("get").invoke(null);
+            Object userManager = provider.getClass().getMethod("getUserManager").invoke(provider);
+            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, uuid);
+            if (user == null) return false;
+
+            Object cachedData = user.getClass().getMethod("getCachedData").invoke(user);
+            Object permissionData = cachedData.getClass().getMethod("getPermissionData").invoke(cachedData);
+            Object result = permissionData.getClass()
+                    .getMethod("checkPermission", String.class)
+                    .invoke(permissionData, "paexium.juez");
+
+            return (boolean) result.getClass().getMethod("asBoolean").invoke(result);
+
         } catch (Exception e) {
             return false;
         }
     }
+
 
     private int getParcelaDeJugador(UUID uuid) {
         Map<UUID, Integer> asignaciones = AsignarParcelasCommand.cargarAsignaciones();
