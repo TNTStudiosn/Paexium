@@ -48,7 +48,9 @@ public class VotarCommand {
                         List<Integer> parcelIds = new ArrayList<>(parcelas.keySet());
                         Collections.sort(parcelIds);
 
-
+                        if (parcelIds.size() > cantidadParcelasActivas) {
+                            parcelIds = parcelIds.subList(0, cantidadParcelasActivas);
+                        }
 
                         // Inicializar o cargar la data de votación primero
                         String roundKey = String.valueOf(rondaNum);
@@ -79,11 +81,6 @@ public class VotarCommand {
                                 }
                             }
                         }
-                        else {
-                            if (parcelIds.size() > cantidadParcelasActivas) {
-                                parcelIds = parcelIds.subList(0, cantidadParcelasActivas);
-                            }
-                        }
 
 
                         // Buscar la siguiente parcela que no haya sido votada
@@ -107,6 +104,7 @@ public class VotarCommand {
                             InfoParcela currentInfo = votingData.get(String.valueOf(currentParcelVoting));
                             if (currentInfo != null) {
                                 currentInfo.votada = true; // 🔁 Marcar como votada *antes* de buscar la siguiente
+                                currentParcelVoting = null;
                             }
 
                             Map<UUID, Integer> asignaciones = AsignarParcelasCommand.cargarAsignaciones();

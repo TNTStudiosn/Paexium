@@ -68,9 +68,11 @@ public class ResultadosCommand {
 
                                 for (Map.Entry<Integer, List<Map.Entry<String, InfoParcela>>> groupEntry : grouped.entrySet()) {
                                     List<Map.Entry<String, InfoParcela>> grupo = groupEntry.getValue();
-                                    if (eliminables.size() + grupo.size() < eliminadosConfig) {
+                                    int faltan = eliminadosConfig - eliminables.size();
+
+                                    if (grupo.size() < faltan) {
                                         eliminables.addAll(grupo);
-                                    } else if (eliminables.size() + grupo.size() == eliminadosConfig) {
+                                    } else if (grupo.size() == faltan) {
                                         eliminables.addAll(grupo);
                                         empate.clear();
                                         break;
