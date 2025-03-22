@@ -1,11 +1,9 @@
 package com.TNTStudios.paexium;
 
-import com.TNTStudios.paexium.commands.ResetParcelasCommand;
-import com.TNTStudios.paexium.commands.RuletaCommand;
-import com.TNTStudios.paexium.commands.TeleportParcelaCommand;
+import com.TNTStudios.paexium.commands.*;
 import com.TNTStudios.paexium.items.PaexiumItems;
+import com.TNTStudios.paexium.parcelas.RondaManager;
 import net.fabricmc.api.ModInitializer;
-import com.TNTStudios.paexium.commands.ParcelaCommand;
 import com.TNTStudios.paexium.parcelas.ParcelManager;
 
 public class Paexium implements ModInitializer {
@@ -18,5 +16,8 @@ public class Paexium implements ModInitializer {
         ParcelManager.load();
         TeleportParcelaCommand.register();
         ResetParcelasCommand.register();
+        CrearRondaCommand.register();
+        RondaManager.cargar();
     }
 }
+
