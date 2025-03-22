@@ -2,8 +2,10 @@ package com.TNTStudios.paexium.commands;
 
 import com.TNTStudios.paexium.items.PaexiumItems;
 import com.TNTStudios.paexium.parcelas.ParcelManager;
+import com.TNTStudios.paexium.parcelas.RondaManager;
 import com.TNTStudios.paexium.votacion.VotacionManager;
 import com.TNTStudios.paexium.votacion.VotacionManager.InfoParcela;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -23,14 +25,19 @@ public class VotarCommand {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(CommandManager.literal("votar")
+                    .then(CommandManager.argument("ronda", IntegerArgumentType.integer(1, 4))
                     .requires(source -> source.hasPermissionLevel(4))
                     .executes(context -> {
+                        int rondaNum = IntegerArgumentType.getInteger(context, "ronda");
                         ServerCommandSource source = context.getSource();
-                        int currentRound = VotacionManager.getRondaActual();
-                        if (currentRound <= 0) {
-                            source.sendError(Text.literal("❌ No hay una ronda de votación activa."));
+
+                        RondaManager.RondaData rondaData = com.TNTStudios.paexium.parcelas.RondaManager.obtenerRondas().get(rondaNum);
+                        if (rondaData == null) {
+                            source.sendError(Text.literal("❌ La ronda " + rondaNum + " no está configurada."));
                             return 0;
                         }
+                        int cantidadParcelasActivas = rondaData.participantes;
+
 
                         // Obtener todas las parcelas y ordenarlas de menor a mayor ID
                         Map<Integer, Vec3i[]> parcelas = ParcelManager.getParcelas();
@@ -40,9 +47,13 @@ public class VotarCommand {
                         }
                         List<Integer> parcelIds = new ArrayList<>(parcelas.keySet());
                         Collections.sort(parcelIds);
+                        if (parcelIds.size() > cantidadParcelasActivas) {
+                            parcelIds = parcelIds.subList(0, cantidadParcelasActivas);
+                        }
+
 
                         // Obtener (o inicializar) la data de votación para la ronda actual
-                        String roundKey = String.valueOf(currentRound);
+                        String roundKey = String.valueOf(rondaNum);
                         Map<String, InfoParcela> votingData = VotacionManager.getVotingDataForRound(roundKey);
                         if (votingData == null) {
                             votingData = new HashMap<>();
@@ -144,7 +155,7 @@ public class VotarCommand {
                         }
 
                         return 1;
-                    }));
+                    })));
         });
     }
 
