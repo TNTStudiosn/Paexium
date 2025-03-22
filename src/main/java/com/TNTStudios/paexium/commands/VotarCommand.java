@@ -77,6 +77,11 @@ public class VotarCommand {
 
                         // Si hay una parcela en votación activa, poner a sus jugadores en modo SPECTATOR y marcarla como votada
                         if (currentParcelVoting != null) {
+                            InfoParcela currentInfo = votingData.get(String.valueOf(currentParcelVoting));
+                            if (currentInfo != null) {
+                                currentInfo.votada = true; // 🔁 Marcar como votada *antes* de buscar la siguiente
+                            }
+
                             Map<UUID, Integer> asignaciones = AsignarParcelasCommand.cargarAsignaciones();
                             if (asignaciones != null) {
                                 for (ServerPlayerEntity player : source.getServer().getPlayerManager().getPlayerList()) {
@@ -85,11 +90,8 @@ public class VotarCommand {
                                     }
                                 }
                             }
-                            InfoParcela currentInfo = votingData.get(String.valueOf(currentParcelVoting));
-                            if (currentInfo != null) {
-                                currentInfo.votada = true;
-                            }
                         }
+
 
                         // Actualizar la parcela actual en votación
                         currentParcelVoting = nextParcel;
@@ -98,9 +100,9 @@ public class VotarCommand {
                         Vec3i[] coords = parcelas.get(nextParcel);
                         Vec3i min = coords[0];
                         Vec3i max = coords[1];
-                        double centerX = (min.getX() + max.getX()) / 2.0 + 0.5;
-                        double centerY = (min.getY() + max.getY()) / 2.0 + 1;
-                        double centerZ = (min.getZ() + max.getZ()) / 2.0 + 0.5;
+                        double centerX = min.getX() + 0.5;
+                        double centerY = min.getY() + 1;
+                        double centerZ = min.getZ() + 0.5;
 
                         // Obtener asignaciones (si existen) para saber qué jugadores están asignados a cada parcela
                         Map<UUID, Integer> asignaciones = AsignarParcelasCommand.cargarAsignaciones();
