@@ -147,8 +147,15 @@ public class EmpezarRondaCommand {
 
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             bossBar.addPlayer(player);
-        }
 
+            // Mostrar mensaje al iniciar el contador
+            player.networkHandler.sendPacket(new TitleS2CPacket(
+                    Text.literal("🚀 ¡Comienza la ronda!").formatted(Formatting.GREEN)
+            ));
+            player.networkHandler.sendPacket(new SubtitleS2CPacket(
+                    Text.literal("¡Buena suerte!").formatted(Formatting.YELLOW)
+            ));
+        }
         actualizarBossbar();
     }
 
