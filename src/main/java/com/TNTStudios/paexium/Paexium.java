@@ -18,6 +18,8 @@ public class Paexium implements ModInitializer {
         ResetParcelasCommand.register();
         CrearRondaCommand.register();
         RondaManager.cargar();
+        AsignarParcelasCommand.register();
+        VerParcelaCommand.register();
     }
 }
 
