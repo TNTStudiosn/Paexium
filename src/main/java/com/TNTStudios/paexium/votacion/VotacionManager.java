@@ -21,13 +21,15 @@ import java.util.UUID;
  *       "jugadores": {
  *         "uuidPaco": 10,
  *         "uuidJuan": 1
- *       }
+ *       },
+ *       "votada": false
  *     },
  *     "2": {
  *       "total": 5,
  *       "jugadores": {
  *         "uuidMiguel": 5
- *       }
+ *       },
+ *       "votada": false
  *     }
  *   },
  *   "2": { ... },
@@ -105,6 +107,22 @@ public class VotacionManager {
         return data.get(rKey).get(String.valueOf(parcela));
     }
 
+    /**
+     * Devuelve la data de votación para la ronda especificada.
+     */
+    public static Map<String, InfoParcela> getVotingDataForRound(String roundKey) {
+        cargar();
+        return data.get(roundKey);
+    }
+
+    /**
+     * Actualiza la data de votación para la ronda especificada.
+     */
+    public static void setVotingDataForRound(String roundKey, Map<String, InfoParcela> votingData) {
+        data.put(roundKey, votingData);
+        guardar();
+    }
+
     private static void guardar() {
         try {
             file.getParentFile().mkdirs();
@@ -134,5 +152,6 @@ public class VotacionManager {
     public static class InfoParcela {
         public int total = 0;
         public Map<UUID, Integer> jugadores = new HashMap<>();
+        public boolean votada = false; // Flag para indicar si la parcela ya fue votada
     }
 }
