@@ -1,8 +1,11 @@
 package com.TNTStudios.paexium.commands;
 
 import com.TNTStudios.paexium.parcelas.ParcelManager;
+import com.TNTStudios.paexium.parcelas.RondaManager;
+import com.TNTStudios.paexium.parcelas.RondaManager.RondaData;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
@@ -29,53 +32,62 @@ public class AsignarParcelasCommand {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registry, env) -> {
             dispatcher.register(CommandManager.literal("asignarparcelas")
-                    .requires(source -> source.hasPermissionLevel(4))
-                    .executes(ctx -> {
-                        ServerCommandSource source = ctx.getSource();
-                        List<ServerPlayerEntity> jugadores = new ArrayList<>();
-                        List<Integer> parcelasDisponibles = new ArrayList<>(ParcelManager.getParcelas().keySet());
+                    .requires(src -> src.hasPermissionLevel(4))
+                    .then(CommandManager.argument("ronda", IntegerArgumentType.integer(1))
+                            .executes(ctx -> {
+                                ServerCommandSource source = ctx.getSource();
+                                int rondaNum = IntegerArgumentType.getInteger(ctx, "ronda");
+                                RondaData ronda = RondaManager.obtenerRondas().get(rondaNum);
 
-                        // ✅ Ordenar parcelas para asignar desde la número 1
-                        Collections.sort(parcelasDisponibles);
+                                if (ronda == null) {
+                                    source.sendError(Text.literal("❌ La ronda " + rondaNum + " no está configurada."));
+                                    return 0;
+                                }
 
-                        Map<UUID, Integer> asignaciones = new HashMap<>();
-                        int index = 0;
+                                int maxPorParcela = ronda.porParcela;
+                                List<ServerPlayerEntity> jugadoresValidos = new ArrayList<>();
+                                for (ServerPlayerEntity jugador : source.getServer().getPlayerManager().getPlayerList()) {
+                                    if (jugador.interactionManager.getGameMode() == GameMode.SPECTATOR) continue;
+                                    if (esJuez(jugador.getUuid())) continue;
+                                    jugadoresValidos.add(jugador);
+                                }
 
-                        for (ServerPlayerEntity jugador : source.getServer().getPlayerManager().getPlayerList()) {
-                            if (index >= parcelasDisponibles.size()) break;
+                                List<Integer> parcelasDisponibles = new ArrayList<>(ParcelManager.getParcelas().keySet());
+                                Collections.sort(parcelasDisponibles);
 
-                            if (jugador.interactionManager.getGameMode() == GameMode.SPECTATOR) continue;
-                            if (esJuez(jugador.getUuid())) continue;
+                                Map<UUID, Integer> asignaciones = new HashMap<>();
+                                int jugadorIndex = 0;
 
-                            int parcela = parcelasDisponibles.get(index++);
-                            asignaciones.put(jugador.getUuid(), parcela);
+                                for (int parcelaId : parcelasDisponibles) {
+                                    for (int i = 0; i < maxPorParcela && jugadorIndex < jugadoresValidos.size(); i++) {
+                                        ServerPlayerEntity jugador = jugadoresValidos.get(jugadorIndex++);
+                                        asignaciones.put(jugador.getUuid(), parcelaId);
 
-                            // 📢 Mensaje al admin
-                            source.sendFeedback(() ->
-                                    Text.literal("✅ Jugador " + jugador.getName().getString() + " asignado a parcela " + parcela), false);
+                                        source.sendFeedback(() ->
+                                                Text.literal("✅ Jugador " + jugador.getName().getString() +
+                                                        " asignado a parcela " + parcelaId), false);
 
-                            // 🪧 Título para el jugador
-                            jugador.networkHandler.sendPacket(new TitleS2CPacket(
-                                    Text.literal(jugador.getName().getString()).formatted(Formatting.GOLD)
-                            ));
-                            jugador.networkHandler.sendPacket(new SubtitleS2CPacket(
-                                    Text.literal("Has sido asignado a la parcela " + parcela).formatted(Formatting.AQUA)
-                            ));
-                        }
+                                        jugador.networkHandler.sendPacket(new TitleS2CPacket(
+                                                Text.literal("📍 Parcela " + parcelaId).formatted(Formatting.GOLD)
+                                        ));
+                                        jugador.networkHandler.sendPacket(new SubtitleS2CPacket(
+                                                Text.literal("¡Has sido asignado a tu parcela!").formatted(Formatting.AQUA)
+                                        ));
+                                    }
+                                    if (jugadorIndex >= jugadoresValidos.size()) break;
+                                }
 
-                        guardarAsignaciones(asignaciones);
-                        return 1;
-                    }));
+                                guardarAsignaciones(asignaciones);
+                                return 1;
+                            })));
         });
     }
 
     private static boolean esJuez(UUID uuid) {
         try {
-            UserManager userManager = LuckPermsProvider.get().getUserManager();
-            User user = userManager.getUser(uuid);
-            if (user == null) return false;
-
-            return user.getCachedData().getPermissionData().checkPermission("paexium.juez").asBoolean();
+            UserManager um = LuckPermsProvider.get().getUserManager();
+            User user = um.getUser(uuid);
+            return user != null && user.getCachedData().getPermissionData().checkPermission("paexium.juez").asBoolean();
         } catch (Exception e) {
             return false;
         }
@@ -95,7 +107,7 @@ public class AsignarParcelasCommand {
     public static Map<UUID, Integer> cargarAsignaciones() {
         if (!file.exists()) return null;
         try (FileReader reader = new FileReader(file)) {
-            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<UUID, Integer>>() {}.getType();
+            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<Map<UUID, Integer>>(){}.getType();
             return gson.fromJson(reader, type);
         } catch (Exception e) {
             e.printStackTrace();
